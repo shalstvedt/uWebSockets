@@ -46,27 +46,27 @@ template <bool isServer>
 void Group<isServer>::addHttpSocket(Poll *httpSocket) {
 
     // always clear last chain!
-    ((uS::SocketData *) httpSocket->getData())->next = nullptr;
-    ((uS::SocketData *) httpSocket->getData())->prev = nullptr;
+    ((uS::SocketData *) httpSocket)->next = nullptr;
+    ((uS::SocketData *) httpSocket)->prev = nullptr;
 
     if (httpSocketHead) {
-        uS::SocketData *nextData = (uS::SocketData *) httpSocketHead->getData();
+        uS::SocketData *nextData = (uS::SocketData *) httpSocketHead;
         nextData->prev = httpSocket;
-        uS::SocketData *data = (uS::SocketData *) httpSocket->getData();
+        uS::SocketData *data = (uS::SocketData *) httpSocket;
         data->next = httpSocketHead;
     } else {
         httpTimer = new Timer(hub->getLoop());
         httpTimer->setData(this);
         httpTimer->start([](Timer *httpTimer) {
-            Group<isServer> *group = (Group<isServer> *) httpTimer->getData();
-            group->forEachHttpSocket([](HttpSocket<isServer> httpSocket) {
+            Group<isServer> *group = (Group<isServer> *) httpTimer;
+            /*group->forEachHttpSocket([](HttpSocket<isServer> httpSocket) {
                 if (httpSocket.getData()->missedDeadline) {
                     // recursive? don't think so!
                     httpSocket.terminate();
                 } else if (!httpSocket.getData()->outstandingResponsesHead) {
                     httpSocket.getData()->missedDeadline = true;
                 }
-            });
+            });*/
         }, 1000, 1000);
     }
     httpSocketHead = httpSocket;
@@ -75,7 +75,7 @@ void Group<isServer>::addHttpSocket(Poll *httpSocket) {
 // WIP
 template <bool isServer>
 void Group<isServer>::removeHttpSocket(Poll *httpSocket) {
-    uS::SocketData *socketData = (uS::SocketData *) httpSocket->getData();
+    uS::SocketData *socketData = (uS::SocketData *) httpSocket;
     if (iterators.size()) {
         iterators.top() = socketData->next;
     }
@@ -87,12 +87,12 @@ void Group<isServer>::removeHttpSocket(Poll *httpSocket) {
 
     } else {
         if (socketData->prev) {
-            ((uS::SocketData *) socketData->prev->getData())->next = socketData->next;
+            ((uS::SocketData *) socketData->prev)->next = socketData->next;
         } else {
             httpSocketHead = socketData->next;
         }
         if (socketData->next) {
-            ((uS::SocketData *) socketData->next->getData())->prev = socketData->prev;
+            ((uS::SocketData *) socketData->next)->prev = socketData->prev;
         }
     }
 }
@@ -101,13 +101,13 @@ template <bool isServer>
 void Group<isServer>::addWebSocket(Poll *webSocket) {
 
     // always clear last chain!
-    ((uS::SocketData *) webSocket->getData())->next = nullptr;
-    ((uS::SocketData *) webSocket->getData())->prev = nullptr;
+    ((uS::SocketData *) webSocket)->next = nullptr;
+    ((uS::SocketData *) webSocket)->prev = nullptr;
 
     if (webSocketHead) {
-        uS::SocketData *nextData = (uS::SocketData *) webSocketHead->getData();
+        uS::SocketData *nextData = (uS::SocketData *) webSocketHead;
         nextData->prev = webSocket;
-        uS::SocketData *data = (uS::SocketData *) webSocket->getData();
+        uS::SocketData *data = (uS::SocketData *) webSocket;
         data->next = webSocketHead;
     }
     webSocketHead = webSocket;
@@ -115,7 +115,7 @@ void Group<isServer>::addWebSocket(Poll *webSocket) {
 
 template <bool isServer>
 void Group<isServer>::removeWebSocket(Poll *webSocket) {
-    uS::SocketData *socketData = (uS::SocketData *) webSocket->getData();
+    uS::SocketData *socketData = (uS::SocketData *) webSocket;
     if (iterators.size()) {
         iterators.top() = socketData->next;
     }
@@ -123,12 +123,12 @@ void Group<isServer>::removeWebSocket(Poll *webSocket) {
         webSocketHead = (Poll *) nullptr;
     } else {
         if (socketData->prev) {
-            ((uS::SocketData *) socketData->prev->getData())->next = socketData->next;
+            ((uS::SocketData *) socketData->prev)->next = socketData->next;
         } else {
             webSocketHead = socketData->next;
         }
         if (socketData->next) {
-            ((uS::SocketData *) socketData->next->getData())->prev = socketData->prev;
+            ((uS::SocketData *) socketData->next)->prev = socketData->prev;
         }
     }
 }

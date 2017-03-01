@@ -34,8 +34,10 @@ public:
 
     template <void C(Socket p, bool error)>
     uS::Socket connect(const char *hostname, int port, bool secure, uS::SocketData *socketData) {
-        Poll *p = new Poll;
-        p->setData(socketData);
+        Poll *p;// = new Poll;
+
+        // todo: broken
+        //p->setData(socketData);
 
         addrinfo hints, *result;
         memset(&hints, 0, sizeof(addrinfo));
@@ -73,16 +75,17 @@ public:
             socketData->ssl = nullptr;
         }
 
-        socketData->poll = UV_READABLE;
-        p->init(loop, fd);
+        socketData->setPoll(UV_READABLE);
+
+        //p->init(loop, fd);
         p->setCb(connect_cb<C>);
-        p->start(UV_WRITABLE);
+        p->start(loop, socketData, UV_WRITABLE);
         return p;
     }
 
     template <void A(Socket s)>
     static void accept_poll_cb(Poll *p, int status, int events) {
-        ListenData *listenData = (ListenData *) p->getData();
+        ListenData *listenData = (ListenData *) p;
         accept_cb<A, false>(listenData);
     }
 
@@ -103,8 +106,8 @@ public:
             * event instead to avoid this.
             */
             if (!TIMER && errno != EAGAIN && errno != EWOULDBLOCK) {
-                listenData->listenPoll->stop();
-                listenData->listenPoll->close();
+                listenData->listenPoll->stop(listenData->nodeData->loop);
+                listenData->listenPoll->close(listenData->nodeData->loop);
                 listenData->listenPoll = nullptr;
 
                 listenData->listenTimer = new Timer(listenData->nodeData->loop);
@@ -116,10 +119,13 @@ public:
             listenData->listenTimer->stop();
             listenData->listenTimer->close();
             listenData->listenTimer = nullptr;
-            listenData->listenPoll = new Poll(listenData->nodeData->loop, serverFd);
-            listenData->listenPoll->setData(listenData);
+
+            // todo: broken
+            //listenData->listenPoll = new Poll(listenData->nodeData->loop, serverFd);
+            //listenData->listenPoll->setData(listenData);
+
             listenData->listenPoll->setCb(accept_poll_cb<A>);
-            listenData->listenPoll->start(UV_READABLE);
+            listenData->listenPoll->start(listenData->nodeData->loop, listenData, UV_READABLE);
         }
         do {
     #ifdef __APPLE__
@@ -135,14 +141,10 @@ public:
             SSL_set_mode(ssl, SSL_MODE_RELEASE_BUFFERS);
         }
 
-        SocketData *socketData = new SocketData(listenData->nodeData);
+        SocketData *socketData = new SocketData(listenData->nodeData, listenData->nodeData->loop, clientFd);
         socketData->ssl = ssl;
-
-        Poll *clientPoll = new Poll(listenData->listenPoll->getLoop(), clientFd);
-        clientPoll->setData(socketData);
-
-        socketData->poll = UV_READABLE;
-        A(clientPoll);
+        socketData->setPoll(UV_READABLE);
+        A(socketData);
         } while ((clientFd = accept(serverFd, nullptr, nullptr)) != INVALID_SOCKET);
     }
 
@@ -201,17 +203,17 @@ public:
             return true;
         }
 
-        ListenData *listenData = new ListenData(nodeData);
+        ListenData *listenData = new ListenData(nodeData, loop, listenFd);
         listenData->sslContext = sslContext;
         listenData->nodeData = nodeData;
 
-        Poll *listenPoll = new Poll(loop, listenFd);
-        listenPoll->setData(listenData);
-        listenPoll->setCb(accept_poll_cb<A>);
-        listenPoll->start(UV_READABLE);
+        listenData->setCb(accept_poll_cb<A>);
+        listenData->start(loop, listenData, UV_READABLE);
 
-        listenData->listenPoll = listenPoll;
+
+        // why is this needed?
         listenData->sock = listenFd;
+
         listenData->ssl = nullptr;
 
         // should be vector of listen data! one group can have many listeners!
