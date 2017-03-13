@@ -4,7 +4,7 @@
 #include <cstdio>
 
 #define MAX_HEADERS 100
-#define MAX_HEADER_BUFFER_SIZE 4096
+#define MAX_HEADER_BUFFER_SIZE 8192
 #define FORCE_SLOW_PATH false
 
 #include <iostream>
@@ -59,6 +59,8 @@ void HttpSocket<isServer>::onData(uS::Socket s, char *data, int length) {
     HttpSocket httpSocket(s);
     HttpSocket::Data *httpData = httpSocket.getData();
 
+    //std::cout << length << std::endl;
+
     httpSocket.cork(true);
 
     if (httpData->contentLength) {
@@ -75,10 +77,12 @@ void HttpSocket<isServer>::onData(uS::Socket s, char *data, int length) {
     }
 
     if (FORCE_SLOW_PATH || httpData->httpBuffer.length()) {
+      /*
         if (httpData->httpBuffer.length() + length > MAX_HEADER_BUFFER_SIZE) {
             httpSocket.onEnd(s);
             return;
         }
+      */
 
         httpData->httpBuffer.reserve(httpData->httpBuffer.length() + length + WebSocketProtocol<uWS::CLIENT>::CONSUME_POST_PADDING);
         httpData->httpBuffer.append(data, length);
@@ -88,7 +92,7 @@ void HttpSocket<isServer>::onData(uS::Socket s, char *data, int length) {
 
     char *end = data + length;
     char *cursor = data;
-    *end = '\r';
+    //*end = '\r';
     Header headers[MAX_HEADERS];
     do {
         char *lastCursor = cursor;
@@ -168,19 +172,18 @@ void HttpSocket<isServer>::onData(uS::Socket s, char *data, int length) {
 
                     delete httpData;
                 } else {
+                    std::cout << "test";
                     httpSocket.onEnd(s);
                 }
                 return;
             }
         } else {
-            if (!httpData->httpBuffer.length()) {
-                if (length > MAX_HEADER_BUFFER_SIZE) {
-                    httpSocket.onEnd(s);
-                } else {
-                    httpData->httpBuffer.append(lastCursor, end - lastCursor);
-                }
-            }
-            return;
+          //if(length < 100)
+          //httpData->httpBuffer.append(lastCursor, end - lastCursor);
+          //else
+            getGroup<isServer>(s)->httpDataHandler(httpData->outstandingResponsesTail, data, length, 0);
+            //httpData->httpBuffer.clear();
+          return;
         }
     } while(cursor != end);
 
@@ -276,9 +279,10 @@ void HttpSocket<isServer>::onEnd(uS::Socket s) {
     }
 
     while (httpSocketData->outstandingResponsesHead) {
-        getGroup<isServer>(s)->httpCancelledRequestHandler(httpSocketData->outstandingResponsesHead);
         HttpResponse *next = httpSocketData->outstandingResponsesHead->next;
-        delete httpSocketData->outstandingResponsesHead;
+        getGroup<isServer>(s)->httpCancelledRequestHandler(httpSocketData->outstandingResponsesHead);
+        if(httpSocketData->outstandingResponsesHead)
+          delete httpSocketData->outstandingResponsesHead;
         httpSocketData->outstandingResponsesHead = next;
     }
 
